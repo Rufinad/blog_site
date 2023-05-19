@@ -5,6 +5,7 @@ from django.views.generic import ListView
 from .forms import EmailPostForm, CommentForm
 from django.core.mail import send_mail
 from django.views.decorators.http import require_POST
+
 class PostlistView(ListView):
     '''Альтернативное представление списка постов'''
 
@@ -45,9 +46,16 @@ def post_detail(request, year, month, day, post):
                              publish__month=month,
                              publish__day=day,
                              )
+    # Список активных комментариев к посту
+    comments = post.comments.filter(active= True)
+    # Форма комментирования пользователями
+    form = CommentForm()
     return render(request,
                   'blog/post/detail.html',
-                  {'post': post})
+                  {'post': post,
+                  'comments': comments,
+                   'form': form}
+                  )
 
 
 def post_share(request, post_id):  # Извлечь пост по идентификатору id
@@ -59,12 +67,14 @@ def post_share(request, post_id):  # Извлечь пост по идентиф
         form = EmailPostForm(request.POST)
         if form.is_valid():  # Поля формы успешно прошли валидацию
             cd = form.cleaned_data
+            # print(cd)  # {'name': 'san', 'email': 'sangrits88@gmail.com', 'to': 'isanek88@gmail.com', 'comments': 'Test share post'}
             post_url = request.build_absolute_uri(post.get_absolute_url())
+            # print(post_url)
             subject = f"{cd['name']} recommends you read" \
             f"{post.title}"
             message = f"Read {post.title} at {post_url}\n\n" \
             f"{cd['name']}\'s comments: {cd['comments']}"
-            send_mail(subject,message, 'sangrits88@gmail.com', [cd['to']])
+            send_mail(subject, message, 'sangrits88@gmail.com', [cd['to']])
             sent = True
     # ... отправить электронное письмо
     else:
@@ -78,7 +88,7 @@ def post_comment(request, post_id):
     post = get_object_or_404(Post, id=post_id, status = Post.Status.PUBLISHED)
     comment = None
     # Комментарий был отправлен
-    form = CommentForm(data=request.Post)  # извлекаем из запроса PoST  его данные (имя, текст, почта)
+    form = CommentForm(data=request.POST)  # извлекаем из запроса PoST  его данные (имя, текст, почта)
     if form.is_valid():  #  Создать объект класса Comment, не сохраняя его в базе данных
         comment = form.save(commit=False)
         # Назначить пост комментарию
